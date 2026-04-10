@@ -95,7 +95,7 @@ function App() {
   const [notices, setNotices] = useState<Notice[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState<TabKey>('personen')
+  const [activeTab, setActiveTab] = useState<TabKey>('invoer')
   const [weeklyExpenseAmount, setWeeklyExpenseAmount] = useState<number>(0)
   const [weeklyExpenseDate, setWeeklyExpenseDate] = useState<string>(defaultFriday())
   const [weeklyExpenseNote, setWeeklyExpenseNote] = useState<string>('')
@@ -826,13 +826,13 @@ function App() {
           )}
 
           <nav className="tabbar">
-            <button className={activeTab === 'personen' ? 'active' : ''} onClick={() => setActiveTab('personen')}>
-              <span className="tab-icon">👥</span>
-              <span className="tab-label">Personen</span>
-            </button>
             <button className={activeTab === 'invoer' ? 'active' : ''} onClick={() => setActiveTab('invoer')}>
               <span className="tab-icon">➕</span>
               <span className="tab-label">Invoer</span>
+            </button>
+            <button className={activeTab === 'personen' ? 'active' : ''} onClick={() => setActiveTab('personen')}>
+              <span className="tab-icon">👥</span>
+              <span className="tab-label">Personen</span>
             </button>
             <button className={activeTab === 'rapportage' ? 'active' : ''} onClick={() => setActiveTab('rapportage')}>
               <span className="tab-icon">📊</span>
