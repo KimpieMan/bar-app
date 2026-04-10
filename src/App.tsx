@@ -175,8 +175,8 @@ function App() {
 
   const negativeBalancesText = useMemo(() => {
     return personBalances
-      .filter((person) => person.balance > 0)
-      .map((person) => `${person.name}: EUR ${person.balance.toFixed(2)}`)
+      .filter((person) => person.balance < 0)
+      .map((person) => `${person.name}: EUR ${Math.abs(person.balance).toFixed(2)}`)
       .join('\n')
   }, [personBalances])
 
@@ -718,7 +718,7 @@ function App() {
                       onClick={() => setExpandedPersonId((prev) => (prev === person.id ? '' : person.id))}
                     >
                       <strong>{person.name}</strong>
-                      <span>Open: EUR {person.balance.toFixed(2)}</span>
+                      <span>Open: EUR {Math.abs(person.balance).toFixed(2)}</span>
                     </button>
                     {expandedPersonId === person.id && (
                       <div className="accordion-body">
@@ -868,10 +868,10 @@ function App() {
               <section className="card">
                 <h2>Negatieve saldo lijst (moet betalen)</h2>
                 {personBalances
-                  .filter((person) => person.balance > 0)
+                  .filter((person) => person.balance < 0)
                   .map((person) => (
                     <p key={person.id}>
-                      {person.name}: EUR {person.balance.toFixed(2)}
+                      {person.name}: EUR {Math.abs(person.balance).toFixed(2)}
                     </p>
                   ))}
                 <label>
