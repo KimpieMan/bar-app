@@ -583,22 +583,27 @@ function App() {
 
           <nav className="tabbar">
             <button className={activeTab === 'personen' ? 'active' : ''} onClick={() => setActiveTab('personen')}>
-              Personen
+              <span className="tab-icon">👥</span>
+              <span className="tab-label">Personen</span>
             </button>
             <button className={activeTab === 'invoer' ? 'active' : ''} onClick={() => setActiveTab('invoer')}>
-              Invoer
+              <span className="tab-icon">➕</span>
+              <span className="tab-label">Invoer</span>
             </button>
             <button className={activeTab === 'historie' ? 'active' : ''} onClick={() => setActiveTab('historie')}>
-              Historie
+              <span className="tab-icon">🧾</span>
+              <span className="tab-label">Historie</span>
             </button>
             <button className={activeTab === 'rapportage' ? 'active' : ''} onClick={() => setActiveTab('rapportage')}>
-              Rapportage
+              <span className="tab-icon">📊</span>
+              <span className="tab-label">Rapportage</span>
             </button>
             <button
               className={activeTab === 'instellingen' ? 'active' : ''}
               onClick={() => setActiveTab('instellingen')}
             >
-              Instellingen
+              <span className="tab-icon">⚙️</span>
+              <span className="tab-label">Instellingen</span>
             </button>
           </nav>
         </>

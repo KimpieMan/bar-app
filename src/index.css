@@ -59,6 +59,7 @@ body {
   border-radius: 12px;
   padding: 12px;
   margin-bottom: 12px;
+  box-shadow: 0 6px 18px rgba(18, 52, 86, 0.06);
 }
 
 .stack {
@@ -170,10 +171,24 @@ td {
 
 .tabbar button {
   margin: 0;
-  font-size: 0.75rem;
-  padding: 10px 4px;
+  font-size: 0.7rem;
+  padding: 8px 4px;
   background: #eaf2fb;
   color: #1d3f72;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.tab-label {
+  line-height: 1;
 }
 
 .tabbar button.active {
@@ -183,10 +198,51 @@ td {
 
 @media (min-width: 900px) {
   .app {
-    padding: 24px 24px 112px;
+    padding: 24px;
   }
 
   .grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .header {
+    padding: 18px 20px;
+    border-radius: 16px;
+  }
+
+  .header h1 {
+    font-size: 1.8rem;
+  }
+
+  .card {
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  .notice-wrap {
+    bottom: 16px;
+  }
+
+  .tabbar {
+    position: static;
+    margin-bottom: 12px;
+    border: 1px solid #d6e0ea;
+    border-radius: 16px;
+    padding: 8px;
+    gap: 8px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    box-shadow: 0 8px 20px rgba(18, 52, 86, 0.08);
+  }
+
+  .tabbar button {
+    font-size: 0.9rem;
+    flex-direction: row;
+    gap: 8px;
+    border-radius: 12px;
+    padding: 12px 10px;
+  }
+
+  .tab-icon {
+    font-size: 1.1rem;
   }
 }
