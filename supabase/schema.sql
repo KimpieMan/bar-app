@@ -24,6 +24,15 @@ create table if not exists public.transactions (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.weekly_expenses (
+  id uuid primary key default gen_random_uuid(),
+  group_id uuid not null references public.groups(id) on delete cascade,
+  amount numeric(12, 2) not null check (amount > 0),
+  event_date date not null,
+  note text,
+  created_at timestamptz not null default now()
+);
+
 create unique index if not exists transactions_tick_unique
   on public.transactions(group_id, person_id, event_date, type)
   where type = 'tick';
@@ -34,10 +43,12 @@ create index if not exists transactions_group_event_idx
 alter table public.groups enable row level security;
 alter table public.persons enable row level security;
 alter table public.transactions enable row level security;
+alter table public.weekly_expenses enable row level security;
 
 drop policy if exists "public_access_groups" on public.groups;
 drop policy if exists "public_access_persons" on public.persons;
 drop policy if exists "public_access_transactions" on public.transactions;
+drop policy if exists "public_access_weekly_expenses" on public.weekly_expenses;
 
 create policy "public_access_groups" on public.groups
   for all
@@ -54,5 +65,11 @@ create policy "public_access_transactions" on public.transactions
   using (true)
   with check (true);
 
+create policy "public_access_weekly_expenses" on public.weekly_expenses
+  for all
+  using (true)
+  with check (true);
+
 alter publication supabase_realtime add table public.persons;
 alter publication supabase_realtime add table public.transactions;
+alter publication supabase_realtime add table public.weekly_expenses;

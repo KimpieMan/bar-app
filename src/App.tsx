@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import * as XLSX from 'xlsx'
 import { format } from 'date-fns'
 import { supabase } from './supabase'
-import type { Group, Person, Transaction } from './types'
+import type { Group, Person, Transaction, WeeklyExpense } from './types'
 
 const TICK_VALUE_EUR = 0.85
 const GROUP_STORAGE_KEY = 'bar-app-group-code'
@@ -78,6 +78,7 @@ function App() {
   const [group, setGroup] = useState<Group | null>(null)
   const [persons, setPersons] = useState<Person[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [weeklyExpenses, setWeeklyExpenses] = useState<WeeklyExpense[]>([])
   const [search, setSearch] = useState('')
   const [expandedPersonId, setExpandedPersonId] = useState<string>('')
   const [bulkNames, setBulkNames] = useState('')
@@ -96,6 +97,9 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<TabKey>('personen')
+  const [weeklyExpenseAmount, setWeeklyExpenseAmount] = useState<number>(0)
+  const [weeklyExpenseDate, setWeeklyExpenseDate] = useState<string>(defaultFriday())
+  const [weeklyExpenseNote, setWeeklyExpenseNote] = useState<string>('')
 
   const personBalances: PersonBalance[] = useMemo(() => {
     return persons
@@ -118,12 +122,18 @@ function App() {
   )
 
   const monthlyRows = useMemo(() => {
-    const map = new Map<string, { ticks: number; payments: number }>()
+    const map = new Map<string, { ticks: number; payments: number; expenses: number }>()
     transactions.forEach((entry) => {
       const month = entry.event_date.slice(0, 7)
-      const current = map.get(month) ?? { ticks: 0, payments: 0 }
+      const current = map.get(month) ?? { ticks: 0, payments: 0, expenses: 0 }
       if (entry.type === 'tick') current.ticks += entry.amount
       if (entry.type === 'payment') current.payments += entry.amount
+      map.set(month, current)
+    })
+    weeklyExpenses.forEach((expense) => {
+      const month = expense.event_date.slice(0, 7)
+      const current = map.get(month) ?? { ticks: 0, payments: 0, expenses: 0 }
+      current.expenses += expense.amount
       map.set(month, current)
     })
     return [...map.entries()]
@@ -131,18 +141,25 @@ function App() {
         month,
         ticks: values.ticks,
         payments: values.payments,
-        debt: values.ticks * TICK_VALUE_EUR - values.payments,
+        expenses: values.expenses,
+        debt: values.ticks * TICK_VALUE_EUR + values.expenses - values.payments,
       }))
       .sort((a, b) => b.month.localeCompare(a.month))
-  }, [transactions])
+  }, [transactions, weeklyExpenses])
 
   const yearlyRows = useMemo(() => {
-    const map = new Map<string, { ticks: number; payments: number }>()
+    const map = new Map<string, { ticks: number; payments: number; expenses: number }>()
     transactions.forEach((entry) => {
       const year = entry.event_date.slice(0, 4)
-      const current = map.get(year) ?? { ticks: 0, payments: 0 }
+      const current = map.get(year) ?? { ticks: 0, payments: 0, expenses: 0 }
       if (entry.type === 'tick') current.ticks += entry.amount
       if (entry.type === 'payment') current.payments += entry.amount
+      map.set(year, current)
+    })
+    weeklyExpenses.forEach((expense) => {
+      const year = expense.event_date.slice(0, 4)
+      const current = map.get(year) ?? { ticks: 0, payments: 0, expenses: 0 }
+      current.expenses += expense.amount
       map.set(year, current)
     })
     return [...map.entries()]
@@ -150,10 +167,18 @@ function App() {
         year,
         ticks: values.ticks,
         payments: values.payments,
-        debt: values.ticks * TICK_VALUE_EUR - values.payments,
+        expenses: values.expenses,
+        debt: values.ticks * TICK_VALUE_EUR + values.expenses - values.payments,
       }))
       .sort((a, b) => b.year.localeCompare(a.year))
-  }, [transactions])
+  }, [transactions, weeklyExpenses])
+
+  const negativeBalancesText = useMemo(() => {
+    return personBalances
+      .filter((person) => person.balance > 0)
+      .map((person) => `${person.name}: EUR ${person.balance.toFixed(2)}`)
+      .join('\n')
+  }, [personBalances])
 
   useEffect(() => {
     localStorage.setItem(FRIDAY_STORAGE_KEY, tickDate)
@@ -187,9 +212,21 @@ function App() {
       )
       .subscribe()
 
+    const expenseChannel = supabase
+      .channel(`weekly-expenses-${group.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'weekly_expenses', filter: `group_id=eq.${group.id}` },
+        () => {
+          void fetchGroupData(group.id)
+        },
+      )
+      .subscribe()
+
     return () => {
       void supabase.removeChannel(personsChannel)
       void supabase.removeChannel(txChannel)
+      void supabase.removeChannel(expenseChannel)
     }
   }, [group])
 
@@ -202,14 +239,17 @@ function App() {
   }
 
   const fetchGroupData = async (groupId: string) => {
-    const [{ data: pData, error: pErr }, { data: tData, error: tErr }] = await Promise.all([
+    const [{ data: pData, error: pErr }, { data: tData, error: tErr }, { data: eData, error: eErr }] = await Promise.all([
       supabase.from('persons').select('*').eq('group_id', groupId).order('name'),
       supabase.from('transactions').select('*').eq('group_id', groupId).order('event_date', { ascending: false }),
+      supabase.from('weekly_expenses').select('*').eq('group_id', groupId).order('event_date', { ascending: false }),
     ])
     if (pErr) return setError(pErr.message)
     if (tErr) return setError(tErr.message)
+    if (eErr) return setError(eErr.message)
     setPersons((pData ?? []) as Person[])
     setTransactions((tData ?? []) as Transaction[])
+    setWeeklyExpenses((eData ?? []) as WeeklyExpense[])
   }
 
   const generateGroupCode = () => Math.random().toString(36).slice(2, 8).toUpperCase()
@@ -472,6 +512,20 @@ function App() {
     await fetchGroupData(group.id)
   }
 
+  const addWeeklyExpense = async () => {
+    if (!group || weeklyExpenseAmount <= 0 || !weeklyExpenseDate) return
+    const { error: insertError } = await supabase.from('weekly_expenses').insert({
+      group_id: group.id,
+      amount: weeklyExpenseAmount,
+      event_date: weeklyExpenseDate,
+      note: weeklyExpenseNote.trim() || null,
+    })
+    if (insertError) return setError(insertError.message)
+    setWeeklyExpenseAmount(0)
+    setWeeklyExpenseNote('')
+    await fetchGroupData(group.id)
+  }
+
   const exportSheet = (mode: 'month' | 'year') => {
     const wb = XLSX.utils.book_new()
     const rows =
@@ -480,6 +534,7 @@ function App() {
             Maand: row.month,
             Streepjes: row.ticks,
             InEuro: (row.ticks * TICK_VALUE_EUR).toFixed(2),
+            Uitgaven: row.expenses.toFixed(2),
             Betaald: row.payments.toFixed(2),
             Openstaand: row.debt.toFixed(2),
           }))
@@ -487,6 +542,7 @@ function App() {
             Jaar: row.year,
             Streepjes: row.ticks,
             InEuro: (row.ticks * TICK_VALUE_EUR).toFixed(2),
+            Uitgaven: row.expenses.toFixed(2),
             Betaald: row.payments.toFixed(2),
             Openstaand: row.debt.toFixed(2),
           }))
@@ -752,7 +808,7 @@ function App() {
                   <h2>Maandrapportage</h2>
                   {monthlyRows.map((row) => (
                     <p key={row.month}>
-                      {row.month}: open EUR {row.debt.toFixed(2)}
+                      {row.month}: open EUR {row.debt.toFixed(2)} (uitgaven EUR {row.expenses.toFixed(2)})
                     </p>
                   ))}
                   <button onClick={() => exportSheet('month')}>Exporteer maand Excel</button>
@@ -761,11 +817,52 @@ function App() {
                   <h2>Jaaroverzicht</h2>
                   {yearlyRows.map((row) => (
                     <p key={row.year}>
-                      {row.year}: open EUR {row.debt.toFixed(2)}
+                      {row.year}: open EUR {row.debt.toFixed(2)} (uitgaven EUR {row.expenses.toFixed(2)})
                     </p>
                   ))}
                   <button onClick={() => exportSheet('year')}>Exporteer jaar Excel</button>
                 </article>
+              </section>
+
+              <section className="card">
+                <h2>Wekelijkse uitgaven consumpties</h2>
+                <div className="stack">
+                  <label>
+                    Bedrag (EUR)
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={weeklyExpenseAmount}
+                      onChange={(e) => setWeeklyExpenseAmount(Number(e.target.value))}
+                    />
+                  </label>
+                  <label>
+                    Datum (week)
+                    <input
+                      type="date"
+                      value={weeklyExpenseDate}
+                      onChange={(e) => setWeeklyExpenseDate(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Opmerking (optioneel)
+                    <input
+                      value={weeklyExpenseNote}
+                      onChange={(e) => setWeeklyExpenseNote(e.target.value)}
+                      placeholder="Bijv. inkoop frisdrank"
+                    />
+                  </label>
+                  <button onClick={() => void addWeeklyExpense()}>Uitgave toevoegen</button>
+                </div>
+                <div className="stack">
+                  {weeklyExpenses.slice(0, 12).map((expense) => (
+                    <p key={expense.id}>
+                      {expense.event_date}: EUR {expense.amount.toFixed(2)}
+                      {expense.note ? ` - ${expense.note}` : ''}
+                    </p>
+                  ))}
+                </div>
               </section>
 
               <section className="card">
@@ -774,9 +871,22 @@ function App() {
                   .filter((person) => person.balance > 0)
                   .map((person) => (
                     <p key={person.id}>
-                      {person.name}: EUR {person.balance.toFixed(2)} ({person.ticks} streepjes)
+                      {person.name}: EUR {person.balance.toFixed(2)}
                     </p>
                   ))}
+                <label>
+                  Kopieerlijst voor doorsturen
+                  <textarea readOnly rows={8} value={negativeBalancesText} />
+                </label>
+                <button
+                  onClick={async () => {
+                    if (!negativeBalancesText.trim()) return
+                    await navigator.clipboard.writeText(negativeBalancesText)
+                    addNotice('Lijst gekopieerd')
+                  }}
+                >
+                  Kopieer lijst
+                </button>
               </section>
             </>
           )}

@@ -21,3 +21,12 @@ export type Transaction = {
   event_date: string
   created_at: string
 }
+
+export type WeeklyExpense = {
+  id: string
+  group_id: string
+  amount: number
+  event_date: string
+  note: string | null
+  created_at: string
+}
