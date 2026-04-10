@@ -191,6 +191,47 @@ td {
   line-height: 1;
 }
 
+.import-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1.1fr 0.9fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.import-head {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.import-row {
+  display: contents;
+}
+
+.import-actions {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .import-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .import-head {
+    display: none;
+  }
+
+  .import-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid #d6e0ea;
+    border-radius: 10px;
+    margin-bottom: 6px;
+  }
+}
+
 .tabbar button.active {
   background: #1d4f91;
   color: #ffffff;

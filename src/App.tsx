@@ -12,6 +12,8 @@ const FRIDAY_STORAGE_KEY = 'bar-app-last-friday'
 type PersonBalance = Person & { ticks: number; payments: number; balance: number }
 type Notice = { id: string; message: string }
 type TabKey = 'personen' | 'invoer' | 'historie' | 'rapportage' | 'instellingen'
+type DraftMode = 'plus' | 'minus'
+type BulkDebtDraft = { id: string; name: string; eur: number; mode: DraftMode }
 
 const toDateInput = (value: Date) => format(value, 'yyyy-MM-dd')
 const defaultFriday = () => {
@@ -39,7 +41,7 @@ const parseBulkDebtRows = (raw: string) =>
       const eur = Number((cols[1] ?? '').replace(',', '.'))
       return { name, eur }
     })
-    .filter((row) => row.name && Number.isFinite(row.eur) && row.eur > 0)
+    .filter((row) => row.name && Number.isFinite(row.eur) && row.eur !== 0)
 
 function App() {
   const [groupCodeInput, setGroupCodeInput] = useState('')
@@ -51,6 +53,7 @@ function App() {
   const [selectedPersonId, setSelectedPersonId] = useState<string>('')
   const [bulkNames, setBulkNames] = useState('')
   const [bulkDebtRows, setBulkDebtRows] = useState('')
+  const [bulkDebtDrafts, setBulkDebtDrafts] = useState<BulkDebtDraft[]>([])
   const [newTickCount, setNewTickCount] = useState(1)
   const [tickDate, setTickDate] = useState(localStorage.getItem(FRIDAY_STORAGE_KEY) ?? defaultFriday())
   const [paymentAmount, setPaymentAmount] = useState<number>(0)
@@ -235,10 +238,22 @@ function App() {
     await fetchGroupData(group.id)
   }
 
-  const addDebtBulk = async (e: FormEvent) => {
+  const prepareDebtBulk = (e: FormEvent) => {
     e.preventDefault()
-    if (!group) return
     const rows = parseBulkDebtRows(bulkDebtRows)
+    if (!rows.length) return
+    const drafts: BulkDebtDraft[] = rows.map((row, index) => ({
+      id: `${Date.now()}-${index}`,
+      name: row.name,
+      eur: Number(Math.abs(row.eur).toFixed(2)),
+      mode: row.eur < 0 ? 'minus' : 'plus',
+    }))
+    setBulkDebtDrafts(drafts)
+  }
+
+  const applyDebtBulk = async () => {
+    if (!group || !bulkDebtDrafts.length) return
+    const rows = bulkDebtDrafts.filter((row) => row.name.trim() && row.eur > 0)
     if (!rows.length) return
 
     const personByName = new Map(persons.map((person) => [person.name.trim().toLowerCase(), person]))
@@ -274,31 +289,45 @@ function App() {
     for (const row of rows) {
       const person = personByName.get(row.name.trim().toLowerCase())
       if (!person?.id) continue
-      const ticksToAdd = Number((row.eur / TICK_VALUE_EUR).toFixed(2))
-      const { data: existing } = await supabase
-        .from('transactions')
-        .select('id,amount')
-        .eq('group_id', group.id)
-        .eq('person_id', person.id)
-        .eq('type', 'tick')
-        .eq('event_date', tickDate)
-        .maybeSingle()
-
-      if (existing) {
-        const { error: updateError } = await supabase
+      if (row.mode === 'plus') {
+        const ticksToAdd = Number((row.eur / TICK_VALUE_EUR).toFixed(2))
+        const { data: existing } = await supabase
           .from('transactions')
-          .update({ amount: Number((existing.amount + ticksToAdd).toFixed(2)) })
-          .eq('id', existing.id)
-        if (updateError) {
-          setError(updateError.message)
-          return
+          .select('id,amount')
+          .eq('group_id', group.id)
+          .eq('person_id', person.id)
+          .eq('type', 'tick')
+          .eq('event_date', tickDate)
+          .maybeSingle()
+
+        if (existing) {
+          const { error: updateError } = await supabase
+            .from('transactions')
+            .update({ amount: Number((existing.amount + ticksToAdd).toFixed(2)) })
+            .eq('id', existing.id)
+          if (updateError) {
+            setError(updateError.message)
+            return
+          }
+        } else {
+          const { error: insertError } = await supabase.from('transactions').insert({
+            group_id: group.id,
+            person_id: person.id,
+            type: 'tick',
+            amount: ticksToAdd,
+            event_date: tickDate,
+          })
+          if (insertError) {
+            setError(insertError.message)
+            return
+          }
         }
       } else {
         const { error: insertError } = await supabase.from('transactions').insert({
           group_id: group.id,
           person_id: person.id,
-          type: 'tick',
-          amount: ticksToAdd,
+          type: 'payment',
+          amount: Number(row.eur.toFixed(2)),
           event_date: tickDate,
         })
         if (insertError) {
@@ -309,6 +338,7 @@ function App() {
     }
 
     setBulkDebtRows('')
+    setBulkDebtDrafts([])
     await fetchGroupData(group.id)
     addNotice(`Bulk schuldimport verwerkt (${rows.length} regels)`)
   }
@@ -504,17 +534,83 @@ function App() {
                   </button>
                 ))}
               </div>
-              <form onSubmit={addDebtBulk} className="stack">
+              <form onSubmit={prepareDebtBulk} className="stack">
                 <h3>Bulk schuld toevoegen (Excel)</h3>
                 <p>Plak regels als: Naam, bedrag_in_euro (ook ; of tab is goed)</p>
                 <textarea
                   value={bulkDebtRows}
                   onChange={(e) => setBulkDebtRows(e.target.value)}
                   rows={5}
-                  placeholder={'Jayden, 12.75\nNoah; 8,50\nEmma\t4.25'}
+                  placeholder={'Jayden, 12.75\nNoah; -8,50\nEmma\t4.25'}
                 />
-                <button type="submit">Bulk schuld importeren</button>
+                <button type="submit">Voorbeeld tonen</button>
               </form>
+
+              {!!bulkDebtDrafts.length && (
+                <div className="stack">
+                  <h3>Bevestigen en corrigeren</h3>
+                  <p>Controleer per regel naam, bedrag en plus/min saldo voordat je importeert.</p>
+                  <div className="import-grid">
+                    <div className="import-head">Naam</div>
+                    <div className="import-head">Bedrag (EUR)</div>
+                    <div className="import-head">Saldo</div>
+                    <div className="import-head">Actie</div>
+                    {bulkDebtDrafts.map((row) => (
+                      <div className="import-row" key={row.id}>
+                        <input
+                          value={row.name}
+                          onChange={(e) =>
+                            setBulkDebtDrafts((prev) =>
+                              prev.map((item) => (item.id === row.id ? { ...item, name: e.target.value } : item)),
+                            )
+                          }
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          value={row.eur}
+                          onChange={(e) =>
+                            setBulkDebtDrafts((prev) =>
+                              prev.map((item) =>
+                                item.id === row.id ? { ...item, eur: Number(e.target.value) || 0 } : item,
+                              ),
+                            )
+                          }
+                        />
+                        <select
+                          value={row.mode}
+                          onChange={(e) =>
+                            setBulkDebtDrafts((prev) =>
+                              prev.map((item) =>
+                                item.id === row.id ? { ...item, mode: e.target.value as DraftMode } : item,
+                              ),
+                            )
+                          }
+                        >
+                          <option value="plus">Plus (schuld omhoog)</option>
+                          <option value="minus">Min (betaling/tegoed)</option>
+                        </select>
+                        <button
+                          type="button"
+                          className="danger"
+                          onClick={() => setBulkDebtDrafts((prev) => prev.filter((item) => item.id !== row.id))}
+                        >
+                          Verwijder
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="import-actions">
+                    <button type="button" onClick={() => setBulkDebtDrafts([])}>
+                      Annuleren
+                    </button>
+                    <button type="button" onClick={() => void applyDebtBulk()}>
+                      Bevestigen en importeren
+                    </button>
+                  </div>
+                </div>
+              )}
             </section>
           )}
 
