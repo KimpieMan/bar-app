@@ -117,6 +117,29 @@ button.danger {
   outline: 2px solid #1d4f91;
 }
 
+.person-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  background: #edf3fb;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.accordion-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.accordion-body {
+  border: 1px solid #d6e0ea;
+  border-radius: 10px;
+  padding: 10px;
+  background: #f9fbfe;
+}
+
 .table-scroll {
   overflow-x: auto;
 }
@@ -153,6 +176,25 @@ td {
   padding: 10px 12px;
   border-radius: 10px;
   box-shadow: 0 5px 20px rgba(29, 79, 145, 0.25);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 26, 45, 0.4);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 30;
+  padding: 12px;
+}
+
+.modal-card {
+  width: min(520px, 100%);
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 12px;
+  border: 1px solid #d6e0ea;
 }
 
 .tabbar {
@@ -262,6 +304,10 @@ td {
 
   .notice-wrap {
     bottom: 16px;
+  }
+
+  .modal-backdrop {
+    align-items: center;
   }
 
   .tabbar {

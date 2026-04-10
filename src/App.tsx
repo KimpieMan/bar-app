@@ -14,6 +14,13 @@ type Notice = { id: string; message: string }
 type TabKey = 'personen' | 'invoer' | 'historie' | 'rapportage' | 'instellingen'
 type DraftMode = 'plus' | 'minus'
 type BulkDebtDraft = { id: string; name: string; eur: number; mode: DraftMode }
+type ActionModal = {
+  open: boolean
+  type: 'tick' | 'payment'
+  personId: string
+  amount: number
+  eventDate: string
+}
 
 const toDateInput = (value: Date) => format(value, 'yyyy-MM-dd')
 const defaultFriday = () => {
@@ -72,23 +79,23 @@ function App() {
   const [persons, setPersons] = useState<Person[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [search, setSearch] = useState('')
-  const [selectedPersonId, setSelectedPersonId] = useState<string>('')
+  const [expandedPersonId, setExpandedPersonId] = useState<string>('')
   const [bulkNames, setBulkNames] = useState('')
   const [bulkDebtRows, setBulkDebtRows] = useState('')
   const [bulkDebtDrafts, setBulkDebtDrafts] = useState<BulkDebtDraft[]>([])
-  const [newTickCount, setNewTickCount] = useState(1)
   const [tickDate, setTickDate] = useState(localStorage.getItem(FRIDAY_STORAGE_KEY) ?? defaultFriday())
-  const [paymentAmount, setPaymentAmount] = useState<number>(0)
+  const [actionModal, setActionModal] = useState<ActionModal>({
+    open: false,
+    type: 'tick',
+    personId: '',
+    amount: 1,
+    eventDate: defaultFriday(),
+  })
   const [editing, setEditing] = useState<Record<string, { amount: number; date: string }>>({})
   const [notices, setNotices] = useState<Notice[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<TabKey>('personen')
-
-  const selectedPerson = useMemo(
-    () => persons.find((person) => person.id === selectedPersonId) ?? null,
-    [persons, selectedPersonId],
-  )
 
   const personBalances: PersonBalance[] = useMemo(() => {
     return persons
@@ -370,66 +377,73 @@ function App() {
     await supabase.from('transactions').delete().eq('person_id', personId).eq('group_id', group.id)
     const { error: deleteError } = await supabase.from('persons').delete().eq('id', personId).eq('group_id', group.id)
     if (deleteError) return setError(deleteError.message)
-    if (selectedPersonId === personId) setSelectedPersonId('')
+    if (expandedPersonId === personId) setExpandedPersonId('')
     await fetchGroupData(group.id)
   }
 
-  const renamePerson = async (personId: string, name: string) => {
-    if (!group) return
-    const clean = name.trim()
-    if (!clean) return
-    const { error: updateError } = await supabase
-      .from('persons')
-      .update({ name: clean })
-      .eq('id', personId)
-      .eq('group_id', group.id)
-    if (updateError) return setError(updateError.message)
-    await fetchGroupData(group.id)
-  }
-
-  const addTicks = async () => {
-    if (!group || !selectedPerson || newTickCount < 1) return
+  const addTicksForPerson = async (personId: string, tickCount: number, eventDate: string) => {
+    if (!group || tickCount <= 0) return
     const { data: existing } = await supabase
       .from('transactions')
       .select('id,amount')
       .eq('group_id', group.id)
-      .eq('person_id', selectedPerson.id)
+      .eq('person_id', personId)
       .eq('type', 'tick')
-      .eq('event_date', tickDate)
+      .eq('event_date', eventDate)
       .maybeSingle()
 
     if (existing) {
       const { error: updateError } = await supabase
         .from('transactions')
-        .update({ amount: existing.amount + newTickCount })
+        .update({ amount: existing.amount + tickCount })
         .eq('id', existing.id)
       if (updateError) return setError(updateError.message)
     } else {
       const { error: insertError } = await supabase.from('transactions').insert({
         group_id: group.id,
-        person_id: selectedPerson.id,
+        person_id: personId,
         type: 'tick',
-        amount: newTickCount,
-        event_date: tickDate,
+        amount: tickCount,
+        event_date: eventDate,
       })
       if (insertError) return setError(insertError.message)
     }
     await fetchGroupData(group.id)
   }
 
-  const addPayment = async () => {
-    if (!group || !selectedPerson || paymentAmount <= 0) return
+  const addPaymentForPerson = async (personId: string, amount: number, eventDate: string) => {
+    if (!group || amount <= 0) return
     const { error: insertError } = await supabase.from('transactions').insert({
       group_id: group.id,
-      person_id: selectedPerson.id,
+      person_id: personId,
       type: 'payment',
-      amount: Number(paymentAmount.toFixed(2)),
-      event_date: tickDate,
+      amount,
+      event_date: eventDate,
     })
     if (insertError) return setError(insertError.message)
-    addNotice(`${selectedPerson.name} heeft EUR ${paymentAmount.toFixed(2)} betaald`)
-    setPaymentAmount(0)
+    const personName = persons.find((person) => person.id === personId)?.name ?? 'Persoon'
+    addNotice(`${personName} heeft EUR ${amount} betaald`)
     await fetchGroupData(group.id)
+  }
+
+  const openActionModal = (personId: string, type: 'tick' | 'payment') => {
+    setActionModal({
+      open: true,
+      type,
+      personId,
+      amount: type === 'tick' ? 1 : 0,
+      eventDate: tickDate || defaultFriday(),
+    })
+  }
+
+  const confirmActionModal = async () => {
+    if (!actionModal.personId || !actionModal.eventDate) return
+    if (actionModal.type === 'tick') {
+      await addTicksForPerson(actionModal.personId, actionModal.amount, actionModal.eventDate)
+    } else {
+      await addPaymentForPerson(actionModal.personId, actionModal.amount, actionModal.eventDate)
+    }
+    setActionModal((prev) => ({ ...prev, open: false }))
   }
 
   const saveEntryEdit = async (entry: Transaction) => {
@@ -543,17 +557,16 @@ function App() {
                 />
                 <button type="submit">Bulk toevoegen</button>
               </form>
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Zoek persoon..." />
               <div className="list">
                 {filteredBalances.map((person) => (
-                  <button
-                    key={person.id}
-                    className={`list-item ${person.id === selectedPersonId ? 'active' : ''}`}
-                    onClick={() => setSelectedPersonId(person.id)}
-                  >
-                    <strong>{person.name}</strong>
-                    <span>Open: EUR {person.balance.toFixed(2)}</span>
-                  </button>
+                  <div key={person.id} className="person-row">
+                    <div>
+                      <strong>{person.name}</strong>
+                    </div>
+                    <button className="danger" onClick={() => void removePerson(person.id)}>
+                      Verwijder
+                    </button>
+                  </div>
                 ))}
               </div>
               <form onSubmit={prepareDebtBulk} className="stack">
@@ -639,45 +652,34 @@ function App() {
           {activeTab === 'invoer' && (
             <section className="card">
               <h2>Invoer</h2>
-              {!selectedPerson && <p>Kies eerst een persoon in de tab Personen.</p>}
-              {selectedPerson && (
-                <div className="stack">
-                  <div>
-                    <input
-                      defaultValue={selectedPerson.name}
-                      onBlur={(e) => void renamePerson(selectedPerson.id, e.target.value)}
-                    />
-                    <button className="danger" onClick={() => void removePerson(selectedPerson.id)}>
-                      Persoon verwijderen
+              <p>Klik op een persoon om acties open te klappen.</p>
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Zoek persoon..." />
+              <div className="list">
+                {filteredBalances.map((person) => (
+                  <div key={person.id} className="accordion-item">
+                    <button
+                      className={`list-item ${expandedPersonId === person.id ? 'active' : ''}`}
+                      onClick={() => setExpandedPersonId((prev) => (prev === person.id ? '' : person.id))}
+                    >
+                      <strong>{person.name}</strong>
+                      <span>Open: EUR {person.balance.toFixed(2)}</span>
                     </button>
+                    {expandedPersonId === person.id && (
+                      <div className="accordion-body">
+                        <p>Saldo: EUR {person.balance.toFixed(2)}</p>
+                        <div className="import-actions">
+                          <button type="button" onClick={() => openActionModal(person.id, 'tick')}>
+                            Streepjes toevoegen
+                          </button>
+                          <button type="button" onClick={() => openActionModal(person.id, 'payment')}>
+                            Betaling registreren
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <label>
-                    Vrijdag datum (instelbaar):
-                    <input type="date" value={tickDate} onChange={(e) => setTickDate(e.target.value)} />
-                  </label>
-                  <label>
-                    Streepjes toevoegen:
-                    <input
-                      type="number"
-                      min={1}
-                      value={newTickCount}
-                      onChange={(e) => setNewTickCount(Number(e.target.value))}
-                    />
-                  </label>
-                  <button onClick={() => void addTicks()}>Streepjes bijtellen</button>
-                  <label>
-                    Bedrag betaald (EUR):
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.01}
-                      value={paymentAmount}
-                      onChange={(e) => setPaymentAmount(Number(e.target.value))}
-                    />
-                  </label>
-                  <button onClick={() => void addPayment()}>Als betaling registreren</button>
-                </div>
-              )}
+                ))}
+              </div>
             </section>
           )}
 
@@ -794,7 +796,7 @@ function App() {
                   setGroup(null)
                   setPersons([])
                   setTransactions([])
-                  setSelectedPersonId('')
+                  setExpandedPersonId('')
                 }}
               >
                 Verlaat groep op dit toestel
@@ -838,6 +840,39 @@ function App() {
           </div>
         ))}
       </div>
+      {actionModal.open && (
+        <div className="modal-backdrop" onClick={() => setActionModal((prev) => ({ ...prev, open: false }))}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <h3>{actionModal.type === 'tick' ? 'Streepjes toevoegen' : 'Betaling registreren'}</h3>
+            <label>
+              {actionModal.type === 'tick' ? 'Aantal streepjes' : 'Bedrag betaald (EUR)'}
+              <input
+                type="number"
+                min={0}
+                step={actionModal.type === 'tick' ? 1 : 0.01}
+                value={actionModal.amount}
+                onChange={(e) => setActionModal((prev) => ({ ...prev, amount: Number(e.target.value) }))}
+              />
+            </label>
+            <label>
+              Datum
+              <input
+                type="date"
+                value={actionModal.eventDate}
+                onChange={(e) => setActionModal((prev) => ({ ...prev, eventDate: e.target.value }))}
+              />
+            </label>
+            <div className="import-actions">
+              <button type="button" onClick={() => setActionModal((prev) => ({ ...prev, open: false }))}>
+                Annuleren
+              </button>
+              <button type="button" onClick={() => void confirmActionModal()}>
+                Opslaan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
