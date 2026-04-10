@@ -28,6 +28,19 @@ const parseBulkNames = (raw: string) =>
     .map((line) => line.trim())
     .filter(Boolean)
 
+const parseBulkDebtRows = (raw: string) =>
+  raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const cols = line.split(/[\t;,]/).map((col) => col.trim())
+      const name = cols[0] ?? ''
+      const eur = Number((cols[1] ?? '').replace(',', '.'))
+      return { name, eur }
+    })
+    .filter((row) => row.name && Number.isFinite(row.eur) && row.eur > 0)
+
 function App() {
   const [groupCodeInput, setGroupCodeInput] = useState('')
   const [groupName, setGroupName] = useState('Scouting Bar')
@@ -37,6 +50,7 @@ function App() {
   const [search, setSearch] = useState('')
   const [selectedPersonId, setSelectedPersonId] = useState<string>('')
   const [bulkNames, setBulkNames] = useState('')
+  const [bulkDebtRows, setBulkDebtRows] = useState('')
   const [newTickCount, setNewTickCount] = useState(1)
   const [tickDate, setTickDate] = useState(localStorage.getItem(FRIDAY_STORAGE_KEY) ?? defaultFriday())
   const [paymentAmount, setPaymentAmount] = useState<number>(0)
@@ -219,6 +233,84 @@ function App() {
     }
     setBulkNames('')
     await fetchGroupData(group.id)
+  }
+
+  const addDebtBulk = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!group) return
+    const rows = parseBulkDebtRows(bulkDebtRows)
+    if (!rows.length) return
+
+    const personByName = new Map(persons.map((person) => [person.name.trim().toLowerCase(), person]))
+    const pendingInserts: { group_id: string; name: string }[] = []
+
+    rows.forEach((row) => {
+      const key = row.name.trim().toLowerCase()
+      if (!personByName.has(key)) {
+        pendingInserts.push({ group_id: group.id, name: row.name.trim() })
+        personByName.set(key, {
+          id: '',
+          group_id: group.id,
+          name: row.name.trim(),
+          created_at: new Date().toISOString(),
+        })
+      }
+    })
+
+    if (pendingInserts.length) {
+      const { data: insertedPeople, error: insertPeopleError } = await supabase
+        .from('persons')
+        .insert(pendingInserts)
+        .select('*')
+      if (insertPeopleError) {
+        setError(insertPeopleError.message)
+        return
+      }
+      ;(insertedPeople ?? []).forEach((person) => {
+        personByName.set(person.name.trim().toLowerCase(), person as Person)
+      })
+    }
+
+    for (const row of rows) {
+      const person = personByName.get(row.name.trim().toLowerCase())
+      if (!person?.id) continue
+      const ticksToAdd = Number((row.eur / TICK_VALUE_EUR).toFixed(2))
+      const { data: existing } = await supabase
+        .from('transactions')
+        .select('id,amount')
+        .eq('group_id', group.id)
+        .eq('person_id', person.id)
+        .eq('type', 'tick')
+        .eq('event_date', tickDate)
+        .maybeSingle()
+
+      if (existing) {
+        const { error: updateError } = await supabase
+          .from('transactions')
+          .update({ amount: Number((existing.amount + ticksToAdd).toFixed(2)) })
+          .eq('id', existing.id)
+        if (updateError) {
+          setError(updateError.message)
+          return
+        }
+      } else {
+        const { error: insertError } = await supabase.from('transactions').insert({
+          group_id: group.id,
+          person_id: person.id,
+          type: 'tick',
+          amount: ticksToAdd,
+          event_date: tickDate,
+        })
+        if (insertError) {
+          setError(insertError.message)
+          return
+        }
+      }
+    }
+
+    setBulkDebtRows('')
+    await fetchGroupData(group.id)
+    addNotice(`Bulk schuldimport verwerkt (${rows.length} regels)`)
   }
 
   const removePerson = async (personId: string) => {
@@ -412,6 +504,17 @@ function App() {
                   </button>
                 ))}
               </div>
+              <form onSubmit={addDebtBulk} className="stack">
+                <h3>Bulk schuld toevoegen (Excel)</h3>
+                <p>Plak regels als: Naam, bedrag_in_euro (ook ; of tab is goed)</p>
+                <textarea
+                  value={bulkDebtRows}
+                  onChange={(e) => setBulkDebtRows(e.target.value)}
+                  rows={5}
+                  placeholder={'Jayden, 12.75\nNoah; 8,50\nEmma\t4.25'}
+                />
+                <button type="submit">Bulk schuld importeren</button>
+              </form>
             </section>
           )}
 
