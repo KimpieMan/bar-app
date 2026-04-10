@@ -127,6 +127,14 @@ button.danger {
   padding: 10px;
 }
 
+.person-row .danger {
+  width: 110px;
+  min-width: 110px;
+  margin-left: auto;
+  padding: 9px 10px;
+  flex: 0 0 auto;
+}
+
 .accordion-item {
   display: flex;
   flex-direction: column;
