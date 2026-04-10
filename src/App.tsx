@@ -107,7 +107,7 @@ function App() {
         const payments = ownEntries
           .filter((entry) => entry.type === 'payment')
           .reduce((sum, entry) => sum + entry.amount, 0)
-        return { ...person, ticks, payments, balance: ticks - payments }
+        return { ...person, ticks, payments, balance: ticks * TICK_VALUE_EUR - payments }
       })
       .sort((a, b) => b.balance - a.balance)
   }, [persons, transactions])
@@ -131,7 +131,7 @@ function App() {
         month,
         ticks: values.ticks,
         payments: values.payments,
-        debt: values.ticks - values.payments,
+        debt: values.ticks * TICK_VALUE_EUR - values.payments,
       }))
       .sort((a, b) => b.month.localeCompare(a.month))
   }, [transactions])
@@ -150,7 +150,7 @@ function App() {
         year,
         ticks: values.ticks,
         payments: values.payments,
-        debt: values.ticks - values.payments,
+        debt: values.ticks * TICK_VALUE_EUR - values.payments,
       }))
       .sort((a, b) => b.year.localeCompare(a.year))
   }, [transactions])
