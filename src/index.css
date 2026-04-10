@@ -22,7 +22,7 @@ body {
 .app {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 12px;
+  padding: 12px 12px 92px;
 }
 
 .header {
@@ -140,7 +140,7 @@ td {
 .notice-wrap {
   position: fixed;
   right: 12px;
-  bottom: 12px;
+  bottom: 84px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -154,9 +154,36 @@ td {
   box-shadow: 0 5px 20px rgba(29, 79, 145, 0.25);
 }
 
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #ffffff;
+  border-top: 1px solid #d6e0ea;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  z-index: 15;
+}
+
+.tabbar button {
+  margin: 0;
+  font-size: 0.75rem;
+  padding: 10px 4px;
+  background: #eaf2fb;
+  color: #1d3f72;
+}
+
+.tabbar button.active {
+  background: #1d4f91;
+  color: #ffffff;
+}
+
 @media (min-width: 900px) {
   .app {
-    padding: 24px;
+    padding: 24px 24px 112px;
   }
 
   .grid {

@@ -11,6 +11,7 @@ const FRIDAY_STORAGE_KEY = 'bar-app-last-friday'
 
 type PersonBalance = Person & { ticks: number; payments: number; balance: number }
 type Notice = { id: string; message: string }
+type TabKey = 'personen' | 'invoer' | 'historie' | 'rapportage' | 'instellingen'
 
 const toDateInput = (value: Date) => format(value, 'yyyy-MM-dd')
 const defaultFriday = () => {
@@ -43,6 +44,7 @@ function App() {
   const [notices, setNotices] = useState<Notice[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [activeTab, setActiveTab] = useState<TabKey>('personen')
 
   const selectedPerson = useMemo(
     () => persons.find((person) => person.id === selectedPersonId) ?? null,
@@ -385,8 +387,8 @@ function App() {
 
       {group && (
         <>
-          <section className="grid">
-            <article className="card">
+          {activeTab === 'personen' && (
+            <section className="card">
               <h2>Personen (max 60)</h2>
               <form onSubmit={addPeopleBulk} className="stack">
                 <textarea
@@ -410,11 +412,13 @@ function App() {
                   </button>
                 ))}
               </div>
-            </article>
+            </section>
+          )}
 
-            <article className="card">
-              <h2>Persoon details</h2>
-              {!selectedPerson && <p>Kies een persoon uit de lijst.</p>}
+          {activeTab === 'invoer' && (
+            <section className="card">
+              <h2>Invoer</h2>
+              {!selectedPerson && <p>Kies eerst een persoon in de tab Personen.</p>}
               {selectedPerson && (
                 <div className="stack">
                   <div>
@@ -453,100 +457,150 @@ function App() {
                   <button onClick={() => void addPayment()}>Als betaling registreren</button>
                 </div>
               )}
-            </article>
-          </section>
+            </section>
+          )}
 
-          <section className="card">
-            <h2>Historische invoer (aanpasbaar)</h2>
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Naam</th>
-                    <th>Type</th>
-                    <th>Hoeveelheid</th>
-                    <th>Datum</th>
-                    <th>Acties</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.map((entry) => {
-                    const person = persons.find((p) => p.id === entry.person_id)
-                    const draft = editing[entry.id] ?? { amount: entry.amount, date: entry.event_date }
-                    return (
-                      <tr key={entry.id}>
-                        <td>{person?.name ?? 'Onbekend'}</td>
-                        <td>{entry.type === 'tick' ? 'Streepjes' : 'Betaling'}</td>
-                        <td>
-                          <input
-                            type="number"
-                            step={entry.type === 'tick' ? 1 : 0.01}
-                            value={draft.amount}
-                            onChange={(e) =>
-                              setEditing((previous) => ({
-                                ...previous,
-                                [entry.id]: { ...draft, amount: Number(e.target.value) },
-                              }))
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="date"
-                            value={draft.date}
-                            onChange={(e) =>
-                              setEditing((previous) => ({
-                                ...previous,
-                                [entry.id]: { ...draft, date: e.target.value },
-                              }))
-                            }
-                          />
-                        </td>
-                        <td>
-                          <button onClick={() => void saveEntryEdit(entry)}>Opslaan</button>
-                          <button className="danger" onClick={() => void deleteEntry(entry.id)}>
-                            Verwijder
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </section>
+          {activeTab === 'historie' && (
+            <section className="card">
+              <h2>Historische invoer (aanpasbaar)</h2>
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Naam</th>
+                      <th>Type</th>
+                      <th>Hoeveelheid</th>
+                      <th>Datum</th>
+                      <th>Acties</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.map((entry) => {
+                      const person = persons.find((p) => p.id === entry.person_id)
+                      const draft = editing[entry.id] ?? { amount: entry.amount, date: entry.event_date }
+                      return (
+                        <tr key={entry.id}>
+                          <td>{person?.name ?? 'Onbekend'}</td>
+                          <td>{entry.type === 'tick' ? 'Streepjes' : 'Betaling'}</td>
+                          <td>
+                            <input
+                              type="number"
+                              step={entry.type === 'tick' ? 1 : 0.01}
+                              value={draft.amount}
+                              onChange={(e) =>
+                                setEditing((previous) => ({
+                                  ...previous,
+                                  [entry.id]: { ...draft, amount: Number(e.target.value) },
+                                }))
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="date"
+                              value={draft.date}
+                              onChange={(e) =>
+                                setEditing((previous) => ({
+                                  ...previous,
+                                  [entry.id]: { ...draft, date: e.target.value },
+                                }))
+                              }
+                            />
+                          </td>
+                          <td>
+                            <button onClick={() => void saveEntryEdit(entry)}>Opslaan</button>
+                            <button className="danger" onClick={() => void deleteEntry(entry.id)}>
+                              Verwijder
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
 
-          <section className="grid">
-            <article className="card">
-              <h2>Maandrapportage</h2>
-              {monthlyRows.map((row) => (
-                <p key={row.month}>
-                  {row.month}: open EUR {row.debt.toFixed(2)}
-                </p>
-              ))}
-              <button onClick={() => exportSheet('month')}>Exporteer maand Excel</button>
-            </article>
-            <article className="card">
-              <h2>Jaaroverzicht</h2>
-              {yearlyRows.map((row) => (
-                <p key={row.year}>
-                  {row.year}: open EUR {row.debt.toFixed(2)}
-                </p>
-              ))}
-              <button onClick={() => exportSheet('year')}>Exporteer jaar Excel</button>
-            </article>
-          </section>
+          {activeTab === 'rapportage' && (
+            <>
+              <section className="grid">
+                <article className="card">
+                  <h2>Maandrapportage</h2>
+                  {monthlyRows.map((row) => (
+                    <p key={row.month}>
+                      {row.month}: open EUR {row.debt.toFixed(2)}
+                    </p>
+                  ))}
+                  <button onClick={() => exportSheet('month')}>Exporteer maand Excel</button>
+                </article>
+                <article className="card">
+                  <h2>Jaaroverzicht</h2>
+                  {yearlyRows.map((row) => (
+                    <p key={row.year}>
+                      {row.year}: open EUR {row.debt.toFixed(2)}
+                    </p>
+                  ))}
+                  <button onClick={() => exportSheet('year')}>Exporteer jaar Excel</button>
+                </article>
+              </section>
 
-          <section className="card">
-            <h2>Negatieve saldo lijst (moet betalen)</h2>
-            {personBalances
-              .filter((person) => person.balance > 0)
-              .map((person) => (
-                <p key={person.id}>
-                  {person.name}: EUR {person.balance.toFixed(2)} ({person.ticks} streepjes)
-                </p>
-              ))}
-          </section>
+              <section className="card">
+                <h2>Negatieve saldo lijst (moet betalen)</h2>
+                {personBalances
+                  .filter((person) => person.balance > 0)
+                  .map((person) => (
+                    <p key={person.id}>
+                      {person.name}: EUR {person.balance.toFixed(2)} ({person.ticks} streepjes)
+                    </p>
+                  ))}
+              </section>
+            </>
+          )}
+
+          {activeTab === 'instellingen' && (
+            <section className="card">
+              <h2>Instellingen</h2>
+              <p>Groepsnaam: {group.name}</p>
+              <p>Groepscode: {group.code}</p>
+              <label>
+                Standaard vrijdag datum:
+                <input type="date" value={tickDate} onChange={(e) => setTickDate(e.target.value)} />
+              </label>
+              <button
+                onClick={() => {
+                  localStorage.removeItem(GROUP_STORAGE_KEY)
+                  setGroup(null)
+                  setPersons([])
+                  setTransactions([])
+                  setSelectedPersonId('')
+                }}
+              >
+                Verlaat groep op dit toestel
+              </button>
+            </section>
+          )}
+
+          <nav className="tabbar">
+            <button className={activeTab === 'personen' ? 'active' : ''} onClick={() => setActiveTab('personen')}>
+              Personen
+            </button>
+            <button className={activeTab === 'invoer' ? 'active' : ''} onClick={() => setActiveTab('invoer')}>
+              Invoer
+            </button>
+            <button className={activeTab === 'historie' ? 'active' : ''} onClick={() => setActiveTab('historie')}>
+              Historie
+            </button>
+            <button className={activeTab === 'rapportage' ? 'active' : ''} onClick={() => setActiveTab('rapportage')}>
+              Rapportage
+            </button>
+            <button
+              className={activeTab === 'instellingen' ? 'active' : ''}
+              onClick={() => setActiveTab('instellingen')}
+            >
+              Instellingen
+            </button>
+          </nav>
         </>
       )}
 
