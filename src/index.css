@@ -1,0 +1,165 @@
+:root {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, sans-serif;
+  color: #0f2235;
+  background: #ffffff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f5f8fc;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 12px;
+}
+
+.header {
+  background: #ffffff;
+  border: 1px solid #d6e0ea;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.header h1 {
+  margin: 0;
+  color: #1d3f72;
+  font-size: 1.4rem;
+}
+
+.group-pill {
+  margin-top: 8px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-weight: 600;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid #d6e0ea;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.join {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+input,
+textarea,
+button {
+  width: 100%;
+  border: 1px solid #b8c8d8;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 0.95rem;
+}
+
+button {
+  background: #1d4f91;
+  color: #ffffff;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+}
+
+button.danger {
+  background: #9d2035;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 340px;
+  overflow: auto;
+  margin-top: 8px;
+}
+
+.list-item {
+  text-align: left;
+  background: #edf3fb;
+  color: #0f2235;
+}
+
+.list-item.active {
+  background: #d2e3f8;
+  outline: 2px solid #1d4f91;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border-bottom: 1px solid #e1e8ef;
+  padding: 8px;
+  text-align: left;
+}
+
+.error {
+  color: #9d2035;
+  font-weight: 600;
+}
+
+.notice-wrap {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notice {
+  background: #1d4f91;
+  color: white;
+  padding: 10px 12px;
+  border-radius: 10px;
+  box-shadow: 0 5px 20px rgba(29, 79, 145, 0.25);
+}
+
+@media (min-width: 900px) {
+  .app {
+    padding: 24px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
