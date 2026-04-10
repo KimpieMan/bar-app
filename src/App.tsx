@@ -11,7 +11,7 @@ const FRIDAY_STORAGE_KEY = 'bar-app-last-friday'
 
 type PersonBalance = Person & { ticks: number; payments: number; balance: number }
 type Notice = { id: string; message: string }
-type TabKey = 'personen' | 'invoer' | 'historie' | 'rapportage' | 'instellingen'
+type TabKey = 'personen' | 'invoer' | 'rapportage' | 'instellingen'
 type DraftMode = 'plus' | 'minus'
 type BulkDebtDraft = { id: string; name: string; eur: number; mode: DraftMode }
 type ActionModal = {
@@ -92,7 +92,6 @@ function App() {
     amount: 1,
     eventDate: defaultFriday(),
   })
-  const [editing, setEditing] = useState<Record<string, { amount: number; date: string }>>({})
   const [notices, setNotices] = useState<Notice[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -486,32 +485,6 @@ function App() {
     setActionModal((prev) => ({ ...prev, open: false }))
   }
 
-  const saveEntryEdit = async (entry: Transaction) => {
-    if (!group) return
-    const draft = editing[entry.id]
-    if (!draft) return
-    const amount = draft.amount > 0 ? draft.amount : entry.amount
-    const { error: updateError } = await supabase
-      .from('transactions')
-      .update({ amount, event_date: draft.date })
-      .eq('id', entry.id)
-      .eq('group_id', group.id)
-    if (updateError) return setError(updateError.message)
-    setEditing((previous) => {
-      const next = { ...previous }
-      delete next[entry.id]
-      return next
-    })
-    await fetchGroupData(group.id)
-  }
-
-  const deleteEntry = async (entryId: string) => {
-    if (!group) return
-    const { error: deleteError } = await supabase.from('transactions').delete().eq('id', entryId).eq('group_id', group.id)
-    if (deleteError) return setError(deleteError.message)
-    await fetchGroupData(group.id)
-  }
-
   const addWeeklyExpense = async () => {
     if (!group || weeklyExpenseAmount <= 0 || !weeklyExpenseDate) return
     const { error: insertError } = await supabase.from('weekly_expenses').insert({
@@ -739,68 +712,6 @@ function App() {
             </section>
           )}
 
-          {activeTab === 'historie' && (
-            <section className="card">
-              <h2>Historische invoer (aanpasbaar)</h2>
-              <div className="table-scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Naam</th>
-                      <th>Type</th>
-                      <th>Hoeveelheid</th>
-                      <th>Datum</th>
-                      <th>Acties</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {transactions.map((entry) => {
-                      const person = persons.find((p) => p.id === entry.person_id)
-                      const draft = editing[entry.id] ?? { amount: entry.amount, date: entry.event_date }
-                      return (
-                        <tr key={entry.id}>
-                          <td>{person?.name ?? 'Onbekend'}</td>
-                          <td>{entry.type === 'tick' ? 'Streepjes' : 'Betaling'}</td>
-                          <td>
-                            <input
-                              type="number"
-                              step={entry.type === 'tick' ? 1 : 0.01}
-                              value={draft.amount}
-                              onChange={(e) =>
-                                setEditing((previous) => ({
-                                  ...previous,
-                                  [entry.id]: { ...draft, amount: Number(e.target.value) },
-                                }))
-                              }
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="date"
-                              value={draft.date}
-                              onChange={(e) =>
-                                setEditing((previous) => ({
-                                  ...previous,
-                                  [entry.id]: { ...draft, date: e.target.value },
-                                }))
-                              }
-                            />
-                          </td>
-                          <td>
-                            <button onClick={() => void saveEntryEdit(entry)}>Opslaan</button>
-                            <button className="danger" onClick={() => void deleteEntry(entry.id)}>
-                              Verwijder
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
-
           {activeTab === 'rapportage' && (
             <>
               <section className="grid">
@@ -922,10 +833,6 @@ function App() {
             <button className={activeTab === 'invoer' ? 'active' : ''} onClick={() => setActiveTab('invoer')}>
               <span className="tab-icon">➕</span>
               <span className="tab-label">Invoer</span>
-            </button>
-            <button className={activeTab === 'historie' ? 'active' : ''} onClick={() => setActiveTab('historie')}>
-              <span className="tab-icon">🧾</span>
-              <span className="tab-label">Historie</span>
             </button>
             <button className={activeTab === 'rapportage' ? 'active' : ''} onClick={() => setActiveTab('rapportage')}>
               <span className="tab-icon">📊</span>
