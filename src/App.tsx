@@ -267,7 +267,7 @@ function App() {
     const drafts: BulkDebtDraft[] = rows.map((row, index) => ({
       id: `${Date.now()}-${index}`,
       name: row.name,
-      eur: Number(Math.abs(row.eur).toFixed(2)),
+      eur: Math.abs(row.eur),
       mode: row.eur < 0 ? 'minus' : 'plus',
     }))
     setBulkDebtDrafts(drafts)
@@ -312,7 +312,7 @@ function App() {
       const person = personByName.get(row.name.trim().toLowerCase())
       if (!person?.id) continue
       if (row.mode === 'plus') {
-        const ticksToAdd = Number((row.eur / TICK_VALUE_EUR).toFixed(2))
+        const ticksToAdd = row.eur / TICK_VALUE_EUR
         const { data: existing } = await supabase
           .from('transactions')
           .select('id,amount')
@@ -325,7 +325,7 @@ function App() {
         if (existing) {
           const { error: updateError } = await supabase
             .from('transactions')
-            .update({ amount: Number((existing.amount + ticksToAdd).toFixed(2)) })
+            .update({ amount: existing.amount + ticksToAdd })
             .eq('id', existing.id)
           if (updateError) {
             setError(updateError.message)
@@ -349,7 +349,7 @@ function App() {
           group_id: group.id,
           person_id: person.id,
           type: 'payment',
-          amount: Number(row.eur.toFixed(2)),
+          amount: row.eur,
           event_date: tickDate,
         })
         if (insertError) {
