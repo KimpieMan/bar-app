@@ -36,9 +36,31 @@ const parseBulkDebtRows = (raw: string) =>
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      const cols = line.split(/[\t;,]/).map((col) => col.trim())
-      const name = cols[0] ?? ''
-      const eur = Number((cols[1] ?? '').replace(',', '.'))
+      let name = ''
+      let amountRaw = ''
+
+      if (line.includes('\t')) {
+        const [first, ...rest] = line.split('\t')
+        name = (first ?? '').trim()
+        amountRaw = rest.join('\t').trim()
+      } else if (line.includes(';')) {
+        const [first, ...rest] = line.split(';')
+        name = (first ?? '').trim()
+        amountRaw = rest.join(';').trim()
+      } else {
+        // Comma-separated input: split only on first comma so decimal comma stays intact.
+        const firstComma = line.indexOf(',')
+        if (firstComma >= 0) {
+          name = line.slice(0, firstComma).trim()
+          amountRaw = line.slice(firstComma + 1).trim()
+        } else {
+          const parts = line.split(/\s+/)
+          name = parts.slice(0, -1).join(' ').trim()
+          amountRaw = parts.at(-1) ?? ''
+        }
+      }
+
+      const eur = Number(amountRaw.replace(/\./g, '').replace(',', '.'))
       return { name, eur }
     })
     .filter((row) => row.name && Number.isFinite(row.eur) && row.eur !== 0)
