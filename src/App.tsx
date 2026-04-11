@@ -38,6 +38,14 @@ const parseBulkNames = (raw: string) =>
     .map((line) => line.trim())
     .filter(Boolean)
 
+const formatEur = (value: number) => value.toFixed(2).replace('.', ',')
+
+const saldoSummary = (balance: number) => {
+  if (balance > 0) return `Te betalen: EUR ${formatEur(balance)}`
+  if (balance < 0) return `Tegoed: EUR ${formatEur(Math.abs(balance))}`
+  return `Saldo: EUR 0,00`
+}
+
 const parseBulkDebtRows = (raw: string) =>
   raw
     .split(/\r?\n/)
@@ -173,10 +181,11 @@ function App() {
       .sort((a, b) => b.year.localeCompare(a.year))
   }, [transactions, weeklyExpenses])
 
-  const negativeBalancesText = useMemo(() => {
+  const debtorsCopyText = useMemo(() => {
     return personBalances
-      .filter((person) => person.balance < 0)
-      .map((person) => `${person.name}: EUR ${Math.abs(person.balance).toFixed(2)}`)
+      .filter((person) => person.balance > 0)
+      .sort((a, b) => a.name.localeCompare(b.name, 'nl'))
+      .map((person) => `${person.name}: EUR ${formatEur(person.balance)}`)
       .join('\n')
   }, [personBalances])
 
@@ -697,11 +706,11 @@ function App() {
                       onClick={() => setExpandedPersonId((prev) => (prev === person.id ? '' : person.id))}
                     >
                       <strong>{person.name}</strong>
-                      <span>Open: EUR {Math.abs(person.balance).toFixed(2)}</span>
+                      <span>{saldoSummary(person.balance)}</span>
                     </button>
                     {expandedPersonId === person.id && (
                       <div className="accordion-body">
-                        <p>Saldo: EUR {person.balance.toFixed(2)}</p>
+                        <p>{saldoSummary(person.balance)}</p>
                         <div className="import-actions">
                           <button type="button" onClick={() => openActionModal(person.id, 'tick')}>
                             Streepjes toevoegen
@@ -783,22 +792,23 @@ function App() {
               </section>
 
               <section className="card">
-                <h2>Negatieve saldo lijst (moet betalen)</h2>
+                <h2>Nog te betalen</h2>
                 {personBalances
-                  .filter((person) => person.balance < 0)
+                  .filter((person) => person.balance > 0)
+                  .sort((a, b) => a.name.localeCompare(b.name, 'nl'))
                   .map((person) => (
                     <p key={person.id}>
-                      {person.name}: EUR {Math.abs(person.balance).toFixed(2)}
+                      {person.name}: EUR {formatEur(person.balance)}
                     </p>
                   ))}
                 <label>
                   Kopieerlijst voor doorsturen
-                  <textarea readOnly rows={8} value={negativeBalancesText} />
+                  <textarea readOnly rows={8} value={debtorsCopyText} />
                 </label>
                 <button
                   onClick={async () => {
-                    if (!negativeBalancesText.trim()) return
-                    await navigator.clipboard.writeText(negativeBalancesText)
+                    if (!debtorsCopyText.trim()) return
+                    await navigator.clipboard.writeText(debtorsCopyText)
                     addNotice('Lijst gekopieerd')
                   }}
                 >
