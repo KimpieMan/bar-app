@@ -18,7 +18,8 @@ type ActionModal = {
   open: boolean
   type: 'tick' | 'payment'
   personId: string
-  amount: number
+  /** Raw input so payment can start empty and typing replaces content naturally */
+  amountDraft: string
   eventDate: string
 }
 
@@ -89,7 +90,7 @@ function App() {
     open: false,
     type: 'tick',
     personId: '',
-    amount: 1,
+    amountDraft: '1',
     eventDate: defaultFriday(),
   })
   const [notices, setNotices] = useState<Notice[]>([])
@@ -470,7 +471,7 @@ function App() {
       open: true,
       type,
       personId,
-      amount: type === 'tick' ? 1 : 0,
+      amountDraft: type === 'tick' ? '1' : '',
       eventDate: tickDate || defaultFriday(),
     })
   }
@@ -478,9 +479,14 @@ function App() {
   const confirmActionModal = async () => {
     if (!actionModal.personId || !actionModal.eventDate) return
     if (actionModal.type === 'tick') {
-      await addTicksForPerson(actionModal.personId, actionModal.amount, actionModal.eventDate)
+      const tickCount = Math.floor(Number(actionModal.amountDraft))
+      if (!Number.isFinite(tickCount) || tickCount < 1) return
+      await addTicksForPerson(actionModal.personId, tickCount, actionModal.eventDate)
     } else {
-      await addPaymentForPerson(actionModal.personId, actionModal.amount, actionModal.eventDate)
+      const raw = actionModal.amountDraft.replace(/\./g, '').replace(',', '.').trim()
+      const amount = Number(raw)
+      if (!Number.isFinite(amount) || amount <= 0) return
+      await addPaymentForPerson(actionModal.personId, amount, actionModal.eventDate)
     }
     setActionModal((prev) => ({ ...prev, open: false }))
   }
@@ -864,11 +870,13 @@ function App() {
             <label>
               {actionModal.type === 'tick' ? 'Aantal streepjes' : 'Bedrag betaald (EUR)'}
               <input
-                type="number"
-                min={0}
-                step={actionModal.type === 'tick' ? 1 : 0.01}
-                value={actionModal.amount}
-                onChange={(e) => setActionModal((prev) => ({ ...prev, amount: Number(e.target.value) }))}
+                type={actionModal.type === 'tick' ? 'number' : 'text'}
+                inputMode={actionModal.type === 'tick' ? 'numeric' : 'decimal'}
+                min={actionModal.type === 'tick' ? 1 : undefined}
+                step={actionModal.type === 'tick' ? 1 : undefined}
+                placeholder={actionModal.type === 'payment' ? 'bijv. 12,50' : undefined}
+                value={actionModal.amountDraft}
+                onChange={(e) => setActionModal((prev) => ({ ...prev, amountDraft: e.target.value }))}
               />
             </label>
             <label>
