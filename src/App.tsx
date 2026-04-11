@@ -40,9 +40,10 @@ const parseBulkNames = (raw: string) =>
 
 const formatEur = (value: number) => value.toFixed(2).replace('.', ',')
 
+/** Saldo = betalingen − (streepjes in EUR). Negatief = nog te betalen, positief = tegoed. */
 const saldoSummary = (balance: number) => {
-  if (balance > 0) return `Te betalen: EUR ${formatEur(balance)}`
-  if (balance < 0) return `Tegoed: EUR ${formatEur(Math.abs(balance))}`
+  if (balance < 0) return `Te betalen: EUR ${formatEur(Math.abs(balance))}`
+  if (balance > 0) return `Tegoed: EUR ${formatEur(balance)}`
   return `Saldo: EUR 0,00`
 }
 
@@ -119,9 +120,9 @@ function App() {
         const payments = ownEntries
           .filter((entry) => entry.type === 'payment')
           .reduce((sum, entry) => sum + entry.amount, 0)
-        return { ...person, ticks, payments, balance: ticks * TICK_VALUE_EUR - payments }
+        return { ...person, ticks, payments, balance: payments - ticks * TICK_VALUE_EUR }
       })
-      .sort((a, b) => b.balance - a.balance)
+      .sort((a, b) => a.balance - b.balance)
   }, [persons, transactions])
 
   const filteredBalances = useMemo(
@@ -183,9 +184,9 @@ function App() {
 
   const debtorsCopyText = useMemo(() => {
     return personBalances
-      .filter((person) => person.balance > 0)
+      .filter((person) => person.balance < 0)
       .sort((a, b) => a.name.localeCompare(b.name, 'nl'))
-      .map((person) => `${person.name}: EUR ${formatEur(person.balance)}`)
+      .map((person) => `${person.name}: EUR ${formatEur(Math.abs(person.balance))}`)
       .join('\n')
   }, [personBalances])
 
@@ -794,11 +795,11 @@ function App() {
               <section className="card">
                 <h2>Nog te betalen</h2>
                 {personBalances
-                  .filter((person) => person.balance > 0)
+                  .filter((person) => person.balance < 0)
                   .sort((a, b) => a.name.localeCompare(b.name, 'nl'))
                   .map((person) => (
                     <p key={person.id}>
-                      {person.name}: EUR {formatEur(person.balance)}
+                      {person.name}: EUR {formatEur(Math.abs(person.balance))}
                     </p>
                   ))}
                 <label>
