@@ -78,7 +78,19 @@ const parseBulkDebtRows = (raw: string) =>
         }
       }
 
-      const eur = Number(amountRaw.replace(/\./g, '').replace(',', '.'))
+      const normalized = amountRaw.trim()
+      let numericText = normalized
+      if (normalized.includes(',') && normalized.includes('.')) {
+        // 1.234,56 -> 1234.56
+        numericText = normalized.replace(/\./g, '').replace(',', '.')
+      } else if (normalized.includes(',')) {
+        // 12,50 -> 12.50
+        numericText = normalized.replace(',', '.')
+      } else {
+        // 12.50 stays 12.50
+        numericText = normalized
+      }
+      const eur = Number(numericText)
       return { name, eur }
     })
     .filter((row) => row.name && Number.isFinite(row.eur) && row.eur !== 0)
