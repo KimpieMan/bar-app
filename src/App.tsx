@@ -326,8 +326,8 @@ function App() {
       id: `${Date.now()}-${index}`,
       name: row.name,
       eur: Math.abs(row.eur),
-      // Old exports often use negative amounts to indicate debt, so default those to debt increase.
-      mode: row.eur < 0 ? 'plus' : 'minus',
+      // Convention: plus = credit, minus = debt.
+      mode: row.eur < 0 ? 'minus' : 'plus',
     }))
     setBulkDebtDrafts(drafts)
   }
@@ -370,7 +370,7 @@ function App() {
     for (const row of rows) {
       const person = personByName.get(row.name.trim().toLowerCase())
       if (!person?.id) continue
-      if (row.mode === 'plus') {
+      if (row.mode === 'minus') {
         const ticksToAdd = row.eur / TICK_VALUE_EUR
         const { data: existing } = await supabase
           .from('transactions')
@@ -670,8 +670,8 @@ function App() {
                             )
                           }
                         >
-                          <option value="plus">Plus (schuld omhoog)</option>
-                          <option value="minus">Min (betaling/tegoed)</option>
+                          <option value="plus">Plus (tegoed omhoog)</option>
+                          <option value="minus">Min (te betalen omhoog)</option>
                         </select>
                         <button
                           type="button"
