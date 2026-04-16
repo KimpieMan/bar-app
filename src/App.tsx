@@ -326,7 +326,8 @@ function App() {
       id: `${Date.now()}-${index}`,
       name: row.name,
       eur: Math.abs(row.eur),
-      mode: row.eur < 0 ? 'minus' : 'plus',
+      // Old exports often use negative amounts to indicate debt, so default those to debt increase.
+      mode: row.eur < 0 ? 'plus' : 'minus',
     }))
     setBulkDebtDrafts(drafts)
   }
