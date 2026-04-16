@@ -135,7 +135,7 @@ function App() {
           .reduce((sum, entry) => sum + entry.amount, 0)
         return { ...person, ticks, payments, balance: payments - ticks * TICK_VALUE_EUR }
       })
-      .sort((a, b) => a.balance - b.balance)
+      .sort((a, b) => a.name.localeCompare(b.name, 'nl'))
   }, [persons, transactions])
 
   const filteredBalances = useMemo(
