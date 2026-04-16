@@ -39,6 +39,7 @@ const parseBulkNames = (raw: string) =>
     .filter(Boolean)
 
 const formatEur = (value: number) => value.toFixed(2).replace('.', ',')
+const formatSignedEur = (value: number) => `${value < 0 ? '-' : ''}EUR ${formatEur(Math.abs(value))}`
 
 /** Saldo = betalingen − (streepjes in EUR). Negatief = nog te betalen, positief = tegoed. */
 const saldoSummary = (balance: number) => {
@@ -151,7 +152,7 @@ function App() {
         ticks: values.ticks,
         payments: values.payments,
         expenses: values.expenses,
-        debt: values.ticks * TICK_VALUE_EUR + values.expenses - values.payments,
+        debt: values.payments - (values.ticks * TICK_VALUE_EUR + values.expenses),
       }))
       .sort((a, b) => b.month.localeCompare(a.month))
   }, [transactions, weeklyExpenses])
@@ -177,7 +178,7 @@ function App() {
         ticks: values.ticks,
         payments: values.payments,
         expenses: values.expenses,
-        debt: values.ticks * TICK_VALUE_EUR + values.expenses - values.payments,
+        debt: values.payments - (values.ticks * TICK_VALUE_EUR + values.expenses),
       }))
       .sort((a, b) => b.year.localeCompare(a.year))
   }, [transactions, weeklyExpenses])
@@ -735,7 +736,7 @@ function App() {
                   <h2>Maandrapportage</h2>
                   {monthlyRows.map((row) => (
                     <p key={row.month}>
-                      {row.month}: open EUR {row.debt.toFixed(2)} (uitgaven EUR {row.expenses.toFixed(2)})
+                      {row.month}: saldo {formatSignedEur(row.debt)} (uitgaven EUR {formatEur(row.expenses)})
                     </p>
                   ))}
                   <button onClick={() => exportSheet('month')}>Exporteer maand Excel</button>
@@ -744,7 +745,7 @@ function App() {
                   <h2>Jaaroverzicht</h2>
                   {yearlyRows.map((row) => (
                     <p key={row.year}>
-                      {row.year}: open EUR {row.debt.toFixed(2)} (uitgaven EUR {row.expenses.toFixed(2)})
+                      {row.year}: saldo {formatSignedEur(row.debt)} (uitgaven EUR {formatEur(row.expenses)})
                     </p>
                   ))}
                   <button onClick={() => exportSheet('year')}>Exporteer jaar Excel</button>
