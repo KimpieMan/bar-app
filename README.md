@@ -33,21 +33,21 @@ Browser app voor commissieleden om streepjes en betalingen bij te houden per gro
 5. Start app:
    - `npm run dev`
 
-## Deployen op Netlify (gratis)
+## Deployen op Cloudflare Pages (gratis)
 
 1. Push `Bar-App` naar GitHub.
-2. In Netlify: **Add new site** -> **Import an existing project**.
-3. Selecteer je repo en gebruik deze settings:
+2. Log in op [Cloudflare](https://dash.cloudflare.com) en ga naar **Pages**.
+3. Klik **Create a project** -> **Connect to Git** en selecteer je repo.
+4. Configureer de build settings:
    - Build command: `npm run build`
-   - Publish directory: `dist`
-4. Voeg in Netlify bij **Site configuration -> Environment variables** toe:
+   - Build output directory: `dist`
+   - Node version: `22` (of hoger)
+5. Voeg environment variables toe:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
-5. Deploy de site.
+6. Deploy!
 
-`netlify.toml` staat al in dit project met:
-- juiste build settings
-- SPA redirect (`/* -> /index.html`) zodat routes blijven werken
+`_redirects` staat in de `public/` folder voor SPA routing (`/* -> /index.html`)
 
 ## Supabase opmerkingen
 
