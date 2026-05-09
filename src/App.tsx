@@ -32,6 +32,27 @@ const defaultFriday = () => {
   return toDateInput(now)
 }
 
+const isFridayDate = (value: string) => {
+  const date = new Date(value)
+  return !Number.isNaN(date.getTime()) && date.getDay() === 5
+}
+
+const getSavedFriday = () => {
+  const saved = localStorage.getItem(FRIDAY_STORAGE_KEY)
+  if (!saved || !isFridayDate(saved)) return defaultFriday()
+
+  const currentFriday = new Date(defaultFriday())
+  const savedDate = new Date(saved)
+  const diffMs = currentFriday.getTime() - savedDate.getTime()
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
+
+  if (Math.abs(diffMs) >= sevenDaysMs) {
+    return defaultFriday()
+  }
+
+  return saved
+}
+
 const parseBulkNames = (raw: string) =>
   raw
     .split(/\r?\n|,/)
@@ -107,7 +128,7 @@ function App() {
   const [bulkNames, setBulkNames] = useState('')
   const [bulkDebtRows, setBulkDebtRows] = useState('')
   const [bulkDebtDrafts, setBulkDebtDrafts] = useState<BulkDebtDraft[]>([])
-  const [tickDate, setTickDate] = useState(localStorage.getItem(FRIDAY_STORAGE_KEY) ?? defaultFriday())
+  const [tickDate, setTickDate] = useState(getSavedFriday())
   const [actionModal, setActionModal] = useState<ActionModal>({
     open: false,
     type: 'tick',
